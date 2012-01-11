@@ -12,6 +12,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 
+from trac.config import Option
 from trac.core import *
 from trac.util import TracError, shorten_line, escape
 from trac.versioncontrol import Changeset, Node, Repository, \
@@ -23,6 +24,9 @@ import PyGIT
 
 class GitConnector(Component):
 	implements(IRepositoryConnector, IWikiSyntaxProvider)
+
+	lookup = Option('trac', 'svn_git_lookup_db', None,
+				 """SVN -> GIT sqlite3 db. (''since 0.10-polopoly'')""")
 
 	#######################
 	# IWikiSyntaxProvider
@@ -53,8 +57,11 @@ class GitConnector(Component):
 	def get_supported_types(self):
 		yield ("git", 8)
 
+    
+
 	def get_repository(self, type, dir, authname):
 		options = dict(self.config.options(type))
+		self.log.info(self.lookup)
 		return GitRepository(dir, self.log, options)
 
 class GitRepository(Repository):
