@@ -35,11 +35,14 @@ class GitConnector(Component):
 
 	def get_wiki_syntax(self):
 		yield (r'\b[0-9a-fA-F]{40,40}\b', 
-		       lambda fmt, sha, match:
-			       self._format_sha_link(fmt, 'changeset', sha, sha))
+		       lambda fmt, sha, match: self._format_sha_link(fmt, 'changeset', sha, sha))
+
+		yield (r'r[1-9][0-9]+',
+		       lambda fmt, rev, match: self._format_rev_link(fmt, 'changeset', rev))
 
 	def get_link_resolvers(self):
 		yield ('sha', self._format_sha_link)
+		yield ('rev', self._format_rev_link)
 
 	def _format_sha_link(self, formatter, ns, sha, label, fullmatch=None):
 		try:
@@ -51,6 +54,14 @@ class GitConnector(Component):
 			return html.a(label, class_="missing changeset",
 				      href=formatter.href.changeset(sha),
 				      title=unicode(e), rel="nofollow")
+
+	def _format_rev_link(self, formatter, ns, rev):
+		sha = self.env.get_repository().get_sha_from_rev(rev)
+		if sha:
+			return self._format_sha_link(formatter, 'changeset', sha, rev)
+		else:
+			return html.a(rev, class_="missing changeset",
+				      href=formatter.href.changeset(rev), rel="nofollow")
 
 
 	#######################
@@ -75,12 +86,14 @@ class GitRepository(Repository):
 
 	def get_sha_from_rev(self, rev):
 		if self.lookup:
+			if rev[0] == 'r':
+				rev = rev[1:]
 			conn  = sqlite.connect(self.lookup)
-			cursor = c.cursor()
+			cursor = conn.cursor()
 			cursor.execute("select sha from lookup where rev = '%s'" % rev)
 			found = None
 			for row in cursor:
-				found = row(1)
+				found = row[0]
 			cursor.close()
 			conn.close()
 			return found
