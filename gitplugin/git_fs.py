@@ -74,7 +74,6 @@ class GitConnector(Component):
 
 	def get_repository(self, type, dir, authname):
 		options = dict(self.config.options(type))
-		self.log.info(self.lookup)
 		return GitRepository(dir, self.lookup, self.log, options)
 
 class GitRepository(Repository):
@@ -284,9 +283,9 @@ class GitChangeset(Changeset):
 		for k in self.props:
 			v = self.props[k]
 			if k in ['committer', 'author']:
-				yield("git-"+k, ", ".join(v), False, 'author')
+				yield("git_"+k, ", ".join(v), False, 'author')
 			if k in ['parent']:
-				yield("git-"+k, ", ".join(("[%s]" % c) for c in v), True, 'changeset')
+				yield("git_"+k, ", ".join(("[%s]" % c) for c in v), True, 'changeset')
 
 	def get_changes(self):
 		#print "GitChangeset.get_changes"
