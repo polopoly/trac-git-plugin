@@ -76,6 +76,15 @@ class GitConnector(Component):
 		options = dict(self.config.options(type))
 		return GitRepository(dir, self.lookup, self.log, options)
 
+def split_branch_path(branch_and_path):
+	if branch_and_path.startswith('RELENG-'):
+		branch_end = branch_and_path.find('/')
+		if branch_end == -1:
+			return (branch_and_path, "")
+		else:
+			return (branch_and_path[0:branch_end], branch_and_path[branch_end:])
+	return (None, branch_and_path)
+
 class GitRepository(Repository):
 	def __init__(self, path, lookup, log, options):
 		self.gitrepo = path
@@ -99,7 +108,7 @@ class GitRepository(Repository):
 		return None
 
 	def get_youngest_rev(self):
-		return self.git.head()
+		return "BRANCHES"
 
 	def normalize_path(self, path):
 		return path and path.strip('/') or ''
@@ -118,9 +127,14 @@ class GitRepository(Repository):
 	def get_oldest_rev(self):
 		return ""
 
-	def get_node(self, path, rev=None):
-		#print "get_node", path, rev
-		return GitNode(self.git, path, rev)
+	def get_node(self, branch_and_path, rev=None):
+		(branch, path) = split_branch_path(branch_and_path.strip('/'))
+		self.log.info("branch, path, rev: %s, %s, %s" % (branch, path, rev))
+		if rev and rev != "BRANCHES":
+			return GitNode(self.git, self.log, path, self.git.branches()[0], rev)
+		if branch:
+			return GitNode(self.git, self.log, path, branch, self.git.verifyrev(branch))
+		return BranchNode(self.git, self.log)
 
 	def get_changesets(self, start, stop):
 		#print "get_changesets", start, stop
@@ -184,10 +198,50 @@ class GitRepository(Repository):
 		#print "GitRepository.sync"
 		pass
 
+class BranchNode(Node):
+	def __init__(self, git, log, branch=None):
+		self.log = log
+		self.git = git
+		self.rev = "BRANCHES"
+		path = ""
+		if branch:
+			self.rev = self.git.verifyrev(branch)
+			path = branch
+		Node.__init__(self, path, self.rev, Node.DIRECTORY)
+
+	def get_content(self):
+		return None
+
+	def get_properties(self):
+		return {}
+
+	def get_entries(self):
+		if self.rev != "BRANCHES":
+			for e in self.git.tree_ls(self.rev, ""):
+				yield GitNode(self.git, self.log, "", self.rev, e)
+		else:
+			for branch in self.git.branches():
+				yield BranchNode(self.git, self.log, branch)
+
+	def get_content_type(self):
+		return None
+
+	def get_content_length(self):
+		return None
+
+	def get_history(self, limit=None):
+		for rev in self.git.history(None, "", limit):
+			yield (self.path, rev, Changeset.EDIT)
+
+	def get_last_modified(self):
+		return None
+
 
 class GitNode(Node):
-	def __init__(self, git, path, rev, tree_ls_info=None):
+	def __init__(self, git, log, path, branch, rev, tree_ls_info=None):
 		self.git = git
+		self.log = log
+		self.branch = branch
 		self.sha = rev
 		self.perm = None
 		self.data_len = None
@@ -216,7 +270,7 @@ class GitNode(Node):
 			else:
 				self.log.debug("kind is "+k)
 
-		Node.__init__(self, path, rev, kind)
+		Node.__init__(self, branch + "/" + path, rev, kind)
 
 		self.created_path = path
 		self.created_rev = rev
@@ -239,10 +293,10 @@ class GitNode(Node):
 		if not self.isdir:
 			return
 
-		p = self.path.strip('/')
+		p = self.created_path.strip('/')
 		if p != '': p = p + '/'
 		for e in self.git.tree_ls(self.rev, p):
-			yield GitNode(self.git, e[3], self.rev, e)
+			yield GitNode(self.git, self.log, e[3], self.branch, self.rev, e)
 
 	def get_content_type(self):
 		if self.isdir:
