@@ -22,6 +22,8 @@ from trac.util.html import escape, html
 
 import PyGIT
 
+import sqlite
+
 class GitConnector(Component):
 	implements(IRepositoryConnector, IWikiSyntaxProvider)
 
@@ -62,13 +64,27 @@ class GitConnector(Component):
 	def get_repository(self, type, dir, authname):
 		options = dict(self.config.options(type))
 		self.log.info(self.lookup)
-		return GitRepository(dir, self.log, options)
+		return GitRepository(dir, self.lookup, self.log, options)
 
 class GitRepository(Repository):
-	def __init__(self, path, log, options):
+	def __init__(self, path, lookup, log, options):
 		self.gitrepo = path
 		self.git = PyGIT.Storage(path)
+		self.lookup = lookup
 		Repository.__init__(self, "git:"+path, None, log)
+
+	def get_sha_from_rev(self, rev):
+		if self.lookup:
+			conn  = sqlite.connect(self.lookup)
+			cursor = c.cursor()
+			cursor.execute("select sha from lookup where rev = '%s'" % rev)
+			found = None
+			for row in cursor:
+				found = row(1)
+			cursor.close()
+			conn.close()
+			return found
+		return None
 
 	def get_youngest_rev(self):
 		return self.git.head()
