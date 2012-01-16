@@ -129,7 +129,7 @@ class GitRepository(Repository):
 
 	def get_node(self, branch_and_path, rev=None):
 		(branch, path) = split_branch_path(branch_and_path.strip('/'))
-		self.log.info("branch, path, rev: %s, %s, %s" % (branch, path, rev))
+
 		if rev and rev != "BRANCHES":
 			return GitNode(self.git, self.log, path, self.git.branches()[0], rev)
 		if branch:
@@ -137,18 +137,15 @@ class GitRepository(Repository):
 		return BranchNode(self.git, self.log)
 
 	def get_changesets(self, start, stop):
-		#print "get_changesets", start, stop
 		for rev in self.git.history_all(start, stop):
 			yield self.get_changeset(rev)
 
 	def get_changeset(self, rev):
-		#print "get_changeset", rev
 		return GitChangeset(self.git, rev)
 
 	def get_changes(self, old_path, old_rev, new_path, new_rev):
 		if old_path != new_path:
 			raise TracError("not supported in git_fs")
-		#print "get_changes", (old_path, old_rev, new_path, new_rev)
 
 		for chg in self.git.diff_tree(old_rev, new_rev, self.normalize_path(new_path)):
 			#print chg
@@ -271,7 +268,6 @@ class GitNode(Node):
 				self.log.debug("kind is "+k)
 
 		Node.__init__(self, branch + "/" + path, rev, kind)
-
 		self.created_path = path
 		self.created_rev = rev
 
@@ -312,7 +308,7 @@ class GitNode(Node):
 
 	def get_history(self, limit=None):
 		#print "get_history", limit, self.path
-		p = self.path.strip('/')
+		p = self.created_path.strip('/')
 		for rev in self.git.history(self.rev, p, limit):
 			yield (self.path, rev, Changeset.EDIT)
 

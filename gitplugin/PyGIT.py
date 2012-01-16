@@ -57,40 +57,9 @@ class Storage:
         return self._git_call("git-rev-parse --short '%s'" % rev).strip()
 
     def branches(self):
-        "get a 'nice' list of branches sorted after the chronological ordering"
+        "get a list of 'release' branches that should be browsable"
         all_branches = self.get_branches()
-        relengs = filter(lambda x: x.startswith("RELENG-9"), all_branches)
-
-        def splitter(x):
-            parts = x.split('-')
-            if len(parts) > 3:
-                major = int(parts[1])
-                minor = int(parts[2])
-                rest = ""
-                if len(parts) > 4:
-                    rest = "-".join(parts[3:])
-                return (major, minor, rest)
-            return (99999999, 9999999, x)
-
-        def sorter(x, y):
-            v1 = splitter(x)
-            v2 = splitter(y)
-            if v1[0] > v2[0]:
-                return -1
-            if v1[0] < v2[0]:
-                return 1
-            if v1[1] > v2[1]:
-                return -1
-            if v1[1] < v2[1]:
-                return 1
-            if v1[2] > v2[1]:
-                return -1
-            if v1[2] < v2[2]:
-                return 1
-            return 0
-
-        relengs.sort(sorter)
-        return relengs
+        return filter(lambda x: x.startswith("RELENG-"), all_branches)
 
     def get_branches(self):
         "returns list of branches, with active (i.e. HEAD) one being the first item"
