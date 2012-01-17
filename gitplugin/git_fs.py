@@ -24,6 +24,8 @@ import PyGIT
 
 import sqlite
 
+import re
+
 class GitConnector(Component):
 	implements(IRepositoryConnector, IWikiSyntaxProvider)
 
@@ -113,10 +115,21 @@ class GitRepository(Repository):
 	def normalize_path(self, path):
 		return path and path.strip('/') or ''
 
+	def rev_or_sha(self, rev):
+		m = re.match("[0-9]{1,9}", rev)
+		if m and m.group(0) == rev:
+			rev_int = int(rev)
+			if rev_int < 65000:
+				sha = self.get_sha_from_rev(rev)
+				if sha:
+					return sha
+		return rev
+
+
 	def normalize_rev(self, rev):
 		if rev=='None' or rev == None or rev == '':
 			return self.get_youngest_rev()
-		normrev=self.git.verifyrev(rev)
+		normrev=self.git.verifyrev(self.rev_or_sha(rev))
 		if normrev is None:
 			raise NoSuchChangeset(rev)
 		return normrev
@@ -141,7 +154,7 @@ class GitRepository(Repository):
 			yield self.get_changeset(rev)
 
 	def get_changeset(self, rev):
-		return GitChangeset(self.git, rev)
+		return GitChangeset(self.git, self.rev_or_sha(rev))
 
 	def get_changes(self, old_path, old_rev, new_path, new_rev):
 		if old_path != new_path:
@@ -276,7 +289,6 @@ class GitNode(Node):
 		Node.__init__(self, path, rev, kind)
 
 	def get_content(self):
-		#print "get_content ", self.path, self.sha
 		if self.isfile:
 			return self.git.get_file(self.sha)
 
@@ -311,7 +323,6 @@ class GitNode(Node):
 		return None
 
 	def get_history(self, limit=None):
-		#print "get_history", limit, self.path
 		p = self.created_path.strip('/')
 		for rev in self.git.history(self.rev, p, limit):
 			yield (self.path, rev, Changeset.EDIT)
@@ -342,7 +353,6 @@ class GitChangeset(Changeset):
 				yield("git_"+k, ", ".join(("[%s]" % c) for c in v), True, 'changeset')
 
 	def get_changes(self):
-		#print "GitChangeset.get_changes"
 		prev = self.props.has_key('parent') and self.props['parent'][0] or None
 		for chg in self.git.diff_tree(prev, self.rev):
 			#print chg
