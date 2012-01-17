@@ -131,7 +131,7 @@ class GitRepository(Repository):
 		(branch, path) = split_branch_path(branch_and_path.strip('/'))
 
 		if rev and rev != "BRANCHES":
-			return GitNode(self.git, self.log, path, self.git.branches()[0], rev)
+			return GitNode(self.git, self.log, path, branch, rev)
 		if branch:
 			return GitNode(self.git, self.log, path, branch, self.git.verifyrev(branch))
 		return BranchNode(self.git, self.log)
@@ -267,9 +267,13 @@ class GitNode(Node):
 			else:
 				self.log.debug("kind is "+k)
 
-		Node.__init__(self, branch + "/" + path, rev, kind)
 		self.created_path = path
 		self.created_rev = rev
+
+		if branch:
+			path = branch + "/" + path
+
+		Node.__init__(self, path, rev, kind)
 
 	def get_content(self):
 		#print "get_content ", self.path, self.sha
