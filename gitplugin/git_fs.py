@@ -39,7 +39,7 @@ class GitConnector(Component):
 		yield (r'\b[0-9a-fA-F]{40,40}\b', 
 		       lambda fmt, sha, match: self._format_sha_link(fmt, 'changeset', sha, sha))
 
-		yield (r'r[1-9][0-9]+',
+		yield (r'\br[0-9]+\b',
 		       lambda fmt, rev, match: self._format_rev_link(fmt, 'changeset', rev))
 
 	def get_link_resolvers(self):
@@ -116,13 +116,10 @@ class GitRepository(Repository):
 		return path and path.strip('/') or ''
 
 	def rev_or_sha(self, rev):
-		m = re.match("[0-9]{1,9}", rev)
-		if m and m.group(0) == rev:
-			rev_int = int(rev)
-			if rev_int < 65000:
-				sha = self.get_sha_from_rev(rev)
-				if sha:
-					return sha
+		if re.match("\b[0-9]{1,9}\b", rev):
+			sha = self.get_sha_from_rev(rev)
+			if sha:
+				return sha
 		return rev
 
 
