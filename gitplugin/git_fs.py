@@ -116,7 +116,7 @@ class GitRepository(Repository):
 		return path and path.strip('/') or ''
 
 	def rev_or_sha(self, rev):
-		if re.match("\b[0-9]{1,9}\b", rev):
+		if re.match(r'\b[0-9]{1,9}\b', rev):
 			sha = self.get_sha_from_rev(rev)
 			if sha:
 				return sha
