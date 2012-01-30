@@ -300,6 +300,11 @@ class BranchNode(Node):
 	def get_last_modified(self):
 		return None
 
+class FakeFile:
+	def __init__(self, content):
+		self.content = content
+	def read(self):
+		return self.content
 
 class GitNode(Node):
 	def __init__(self, git, log, path, branch, rev, tree_ls_info=None):
@@ -309,6 +314,7 @@ class GitNode(Node):
 		self.sha = rev
 		self.perm = None
 		self.data_len = None
+		self.sub = False
 
 		kind = Node.DIRECTORY
 		p = path.strip('/')
@@ -331,6 +337,10 @@ class GitNode(Node):
 				pass
 			elif k=='blob':
 				kind = Node.FILE
+			elif k=='commit':
+				self.sub = True
+				kind = Node.FILE
+				self.data_len = len(self._submodule_get_content())
 			else:
 				self.log.debug("kind is "+k)
 
@@ -342,8 +352,13 @@ class GitNode(Node):
 
 		Node.__init__(self, path, rev, kind)
 
+	def _submodule_get_content(self):
+		return "Subproject commit " + self.sha
+
 	def get_content(self):
 		if self.isfile:
+			if self.sub:
+				return FakeFile(self._submodule_get_content())
 			return self.git.get_file(self.sha)
 
 		return None
