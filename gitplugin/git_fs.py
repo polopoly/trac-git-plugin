@@ -92,9 +92,12 @@ class GitRepository(Repository):
 		self.gitrepo = path
 		self.git = PyGIT.Storage(path)
 		self.lookup = lookup
+		self.debug = False
 		Repository.__init__(self, "git:"+path, None, log)
 
 	def get_sha_from_rev(self, rev):
+		if self.debug:
+			self.log.info('get_sha_from_rev(%s)' % rev)
 		if self.lookup:
 			if rev[0] == 'r':
 				rev = rev[1:]
@@ -106,54 +109,92 @@ class GitRepository(Repository):
 				found = row[0]
 			cursor.close()
 			conn.close()
+			if self.debug:
+				self.log.info('==> %s', found)
 			return found
 		return None
 
 	def get_youngest_rev(self):
+		if self.debug:
+			self.log.info('get_youngest_rev()\n==> BRANCHES')
 		return "BRANCHES"
 
 	def normalize_path(self, path):
-		return path and path.strip('/') or ''
+		result = path and path.strip('/') or ''
+		if self.debug:
+			self.log.info('normalize_path(%s)\n==> %s' % (path, result))
+		return result
 
 	def rev_or_sha(self, rev):
+		result = rev
 		if re.match(r'\b[0-9]{1,9}\b', rev):
 			sha = self.get_sha_from_rev(rev)
 			if sha:
-				return sha
-		return rev
+				rev = sha
+		if self.debug:
+			self.log.info('rev_or_sha(%s)\n==> %s' % (rev, result))
+		return result
 
 
 	def normalize_rev(self, rev):
+		if self.debug:
+			self.log.info('normalize_rev(%s)' % rev)
 		if rev=='None' or rev == None or rev == '':
 			return self.get_youngest_rev()
 		normrev=self.git.verifyrev(self.rev_or_sha(rev))
 		if normrev is None:
 			raise NoSuchChangeset(rev)
+		if self.debug:
+			self.log.info('==> %s' % normrev)
 		return normrev
 
 	def short_rev(self, rev):
-		return self.git.shortrev(self.normalize_rev(rev))
+		result = self.git.shortrev(self.normalize_rev(rev))
+		if self.debug:
+			self.log.info('short_rev(%s)\n==> %s' % (rev, result))
+		return result
 
 	def get_oldest_rev(self):
+		if self.debug:
+			self.log.info('get_oldest_rev()\n==> ""')
 		return ""
 
 	def get_node(self, branch_and_path, rev=None):
+		if self.debug:
+			self.log.info('get_node(%s, %s)' % (branch_and_path, rev))
+
 		(branch, path) = split_branch_path(branch_and_path.strip('/'))
+		if self.debug:
+			self.log.info('==  (branch, path) = (%s, %s)' % (branch, path))
 
 		if rev and rev != "BRANCHES":
+			if self.debug:
+				self.log.info('==> GitNode(%s, %s, %s)' % (path, branch, rev))
 			return GitNode(self.git, self.log, path, branch, rev)
 		if branch:
+			if self.debug:
+				self.log.info('==> GitNode(%s, %s, %s)' % (path, branch, self.git.verifyrev(branch)))
 			return GitNode(self.git, self.log, path, branch, self.git.verifyrev(branch))
+		if self.debug:
+			self.log.info('==> BranchNode()')
 		return BranchNode(self.git, self.log)
 
 	def get_changesets(self, start, stop):
+		if self.debug:
+			self.log.info('get_changeset(%s, %s)' % (start, stop))
 		for rev in self.git.history_all(start, stop):
+			if self.debug:
+				self.log.info('==> get_changeset(%s)' % rev)
 			yield self.get_changeset(rev)
 
 	def get_changeset(self, rev):
+		if self.debug:
+			self.log.info('get_changset(%s)\n==> GitChangeset(%s)' % (rev, self.rev_or_sha(rev)))
 		return GitChangeset(self.git, self.rev_or_sha(rev))
 
 	def get_changes(self, old_path, old_rev, new_path, new_rev):
+		if self.debug:
+			self.log.info('get_changes(%s, %s, %s, %s)' % (old_path, old_rev, new_path, new_rev))
 		if old_path != new_path:
 			raise TracError("not supported in git_fs")
 
@@ -182,27 +223,43 @@ class GitRepository(Repository):
 			if change != Changeset.DELETE:
 				new_node = self.get_node(path, new_rev)
 
+			if self.debug:
+				self.log.info('==> (%s, %s, %s, ...)' % (old_node, new_node, kind))
 			yield (old_node, new_node, kind, change)
 
 	def next_rev(self, rev, path=''):
-		#print "next_rev"
+		if self.debug:
+			self.log.info('next_rev(%s, %s)' % (rev, path))
 		for c in self.git.children(rev):
+			if self.debug:
+				self.log.info('==> %s', c)
 			return c
+		if self.debug:
+			self.log.info('==> None')
 		return None
 
 	def previous_rev(self, rev):
-		#print "previous_rev"
+		if self.debug:
+			self.log.info('previous_rev(%s)' % rev)
 		for p in self.git.parents(rev):
+			if self.debug:
+				self.log.info('==> %s' % p)
 			return p
+		if self.debug:
+			self.log.info('==> None')
 		return None
 
 	def rev_older_than(self, rev1, rev2):
+		if self.debug:
+			self.log.info('rev_older_than(%s, %s)', (rev1, rev2))
 		rc = self.git.rev_is_anchestor(rev1,rev2)
-		#rc = rev1 in self.git.history(rev2, '', skip=1)
+		if self.debug:
+			self.log.info('==> %s', rc)
 		return rc
 
 	def sync(self):
-		#print "GitRepository.sync"
+		if self.debug:
+			self.log.info('sync()\n==> None')
 		pass
 
 class BranchNode(Node):
