@@ -126,8 +126,8 @@ class Storage:
             yield rev.strip()
 
     def history_all(self, start, stop):
-        for rev in self._git_call_f("git-rev-list --reverse --max-age=%d --min-age=%d --all" \
-                                        % (start,stop)).readlines():
+        cmd = "git-rev-list --reverse --max-age=%d --min-age=%d %s"  % (start, stop, ' '.join(self.branches()))
+        for rev in self._git_call_f(cmd).readlines():
             yield rev.strip()
 
     def rev_is_anchestor(self, rev1, rev2):
