@@ -20,6 +20,8 @@ from trac.versioncontrol import Changeset, Node, Repository, \
 from trac.wiki import IWikiSyntaxProvider
 from trac.util.html import escape, html
 
+from trac.versioncontrol.svn_fs import SubversionRepository as SvnRepo
+
 import PyGIT
 
 import sqlite
@@ -30,7 +32,10 @@ class GitConnector(Component):
 	implements(IRepositoryConnector, IWikiSyntaxProvider)
 
 	lookup = Option('trac', 'svn_git_lookup_db', None,
-				 """SVN -> GIT sqlite3 db. (''since 0.10-polopoly'')""")
+			"""SVN -> GIT sqlite3 db. (''since 0.10-polopoly'')""")
+
+	svn_repository = Option('trac', 'svn_repository_dir', None,
+				"""SVN Repository for revisions not yet in GIT (''since 0.10-polopoly'')""")
 
 	#######################
 	# IWikiSyntaxProvider
@@ -76,6 +81,8 @@ class GitConnector(Component):
 
 	def get_repository(self, type, dir, authname):
 		options = dict(self.config.options(type))
+		if self.svn_repository:
+			options['svn_repository'] = self.svn_repository
 		return GitRepository(dir, self.lookup, self.log, options)
 
 def split_branch_path(branch_and_path):
@@ -93,6 +100,8 @@ class GitRepository(Repository):
 		self.git = PyGIT.Storage(path)
 		self.lookup = lookup
 		self.debug = False
+		if 'svn_repository' in options:
+			self.svn_repository = options['svn_repository']
 		Repository.__init__(self, "git:"+path, None, log)
 
 	def get_sha_from_rev(self, rev):
@@ -188,9 +197,19 @@ class GitRepository(Repository):
 			yield self.get_changeset(rev)
 
 	def get_changeset(self, rev):
+		likely_sha = self.rev_or_sha(rev)
+
+		# New commit, not yet in lookup.db
+		if re.match(r'\b[0-9]{1,9}\b', likely_sha) and self.svn_repository:
+			svn = SvnRepo(self.svn_repository, None, None)
+			if self.debug:
+				self.log.info('get_changeset(%s)\n==> SubversionChangeset(%s)' % (rev, likely_sha))
+			return svn.get_changeset(likely_sha)
+
 		if self.debug:
-			self.log.info('get_changset(%s)\n==> GitChangeset(%s)' % (rev, self.rev_or_sha(rev)))
-		return GitChangeset(self.git, self.rev_or_sha(rev))
+			self.log.info('get_changeset(%s)\n==> GitChangeset(%s)' % (rev, likely_sha))
+
+		return GitChangeset(self.git, likely_sha)
 
 	def get_changes(self, old_path, old_rev, new_path, new_rev):
 		if self.debug:
