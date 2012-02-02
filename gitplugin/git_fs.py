@@ -81,8 +81,7 @@ class GitConnector(Component):
 
 	def get_repository(self, type, dir, authname):
 		options = dict(self.config.options(type))
-		if self.svn_repository:
-			options['svn_repository'] = self.svn_repository
+		options['svn_repository'] = self.svn_repository
 		return GitRepository(dir, self.lookup, self.log, options)
 
 def split_branch_path(branch_and_path):
@@ -100,8 +99,7 @@ class GitRepository(Repository):
 		self.git = PyGIT.Storage(path)
 		self.lookup = lookup
 		self.debug = False
-		if 'svn_repository' in options:
-			self.svn_repository = options['svn_repository']
+		self.svn_repository = options['svn_repository']
 		Repository.__init__(self, "git:"+path, None, log)
 
 	def get_sha_from_rev(self, rev):
